@@ -20,31 +20,27 @@ with st.sidebar:
 txt = {
     "Português": {
         "titulo": "KASPA ELITE TRACKER",
-        "login_msg": "Monitoramento @jackmaster273",
-        "aviso": "⚠️ TERMOS: Apenas uma sessão ativa por usuário.",
+        "login_msg": "Acesso Elite @jackmaster273",
         "calc_titulo": "🧮 Calculadora de Fluxo",
         "whale_titulo": "🐳 Whale Watcher (> 1M KAS)",
-        "compra": "COMPRA DETECTADA",
-        "venda": "VENDA DETECTADA",
-        "explorer_titulo": "🔎 Explorer & Transações Reais",
-        "explorer_label": "Endereço da carteira:",
-        "top10_titulo": "📊 Top 10 Mercado",
+        "compra": "COMPRA",
+        "venda": "VENDA",
+        "explorer_titulo": "🔎 Tracker de Carteira",
+        "explorer_label": "Endereço da carteira Kaspa:",
         "logout": "SAIR",
-        "ver_link": "Ver na Blockchain 🔗"
+        "saldo_total": "Saldo Total"
     },
     "English": {
         "titulo": "KASPA ELITE TRACKER",
-        "login_msg": "Monitoring @jackmaster273",
-        "aviso": "⚠️ TERMS: Only one active session per user.",
+        "login_msg": "Elite Access @jackmaster273",
         "calc_titulo": "🧮 Flow Calculator",
         "whale_titulo": "🐳 Whale Watcher (> 1M KAS)",
-        "compra": "BUY DETECTED",
-        "venda": "SELL DETECTED",
-        "explorer_titulo": "🔎 Explorer & Real Transactions",
-        "explorer_label": "Wallet address:",
-        "top10_titulo": "📊 Market Top 10",
+        "compra": "BUY",
+        "venda": "SELL",
+        "explorer_titulo": "🔎 Wallet Tracker",
+        "explorer_label": "Kaspa wallet address:",
         "logout": "LOGOUT",
-        "ver_link": "View on Blockchain 🔗"
+        "saldo_total": "Total Balance"
     }
 }
 
@@ -61,7 +57,6 @@ if not st.session_state["autenticado"]:
         if st.button("ENTER"):
             if user_in in USUARIOS_ELITE and USUARIOS_ELITE[user_in] == pass_in:
                 st.session_state["autenticado"] = True
-                st.session_state["user_email"] = user_in
                 st.rerun()
     st.stop()
 
@@ -73,12 +68,10 @@ def buscar_dados():
     try:
         k = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd,brl&include_24hr_change=true").json()['kaspa']
         d = requests.get("https://api.exchangerate-api.com/v4/latest/USD").json()['rates']['BRL']
-        m = requests.get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=12&page=1").json()
-        top_10 = pd.DataFrame([c for c in m if c['symbol'] not in ['usdt', 'usdc']][:10])[['name', 'current_price', 'price_change_percentage_24h']]
-        return k, d, top_10
-    except: return {"usd": 0.0000, "brl": 0.0000, "usd_24h_change": 0.00}, 5.0000, pd.DataFrame()
+        return k, d
+    except: return {"usd": 0.0000, "brl": 0.0000, "usd_24h_change": 0.00}, 5.0000
 
-kas, dolar_real, top_10_df = buscar_dados()
+kas, dolar_real = buscar_dados()
 
 st.title(f"🟢 {txt[lang]['titulo']}")
 
@@ -91,48 +84,44 @@ c4.metric("24h Var.", f"{kas['usd_24h_change']:.2f}%")
 
 st.write("---")
 
-# 2. EXPLORER COM LINKS REAIS
+# 2. TRACKER DE CARTEIRA (SALDO KAS E USD)
 st.subheader(txt[lang]["explorer_titulo"])
 wallet_address = st.text_input(txt[lang]["explorer_label"])
 if wallet_address:
     try:
         bal_res = requests.get(f"https://api.kaspa.org/addresses/{wallet_address}/balance").json()
-        balance = bal_res['balance'] / 100000000
-        st.success(f"Saldo: **{balance:.4f} KAS**")
-        st.markdown(f"[🔗 {txt[lang]['ver_link']}](https://kas.fyi/address/{wallet_address})")
+        balance_kas = bal_res['balance'] / 100000000
+        balance_usd = balance_kas * kas['usd']
         
-        tx_res = requests.get(f"https://api.kaspa.org/addresses/{wallet_address}/full-transactions?limit=5").json()
-        for i, tx in enumerate(tx_res, 1):
-            with st.expander(f"TX {i}"):
-                st.markdown(f"**Hash:** [{tx['transaction_id']}](https://kas.fyi/transaction/{tx['transaction_id']})")
-                amt = sum([out['amount'] for out in tx['outputs']]) / 100000000
-                st.write(f"Valor: {amt:.4f} KAS")
-    except: st.error("Erro na busca")
+        st.success(f"**{txt[lang]['saldo_total']}**")
+        col_a, col_b = st.columns(2)
+        col_a.metric("Saldo (KAS)", f"{balance_kas:.4f} KAS")
+        col_b.metric("Saldo (USD)", f"$ {balance_usd:.4f}")
+        st.markdown(f"[🔗 Ver na Blockchain](https://kas.fyi/address/{wallet_address})")
+    except: st.error("Endereço não encontrado.")
 
 # 3. CALCULADORA
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.subheader(txt[lang]["calc_titulo"])
-col_usd, col_kas, col_brl = st.columns(3)
-v_usd = col_usd.number_input("Dólar ($):", value=1000.0, format="%.4f")
-col_usd.write(f"↳ **{v_usd / kas['usd']:.4f} KAS**")
-v_kas = col_kas.number_input("Kaspa (KAS):", value=10000.0, format="%.4f")
-col_kas.write(f"↳ **$ {v_kas * kas['usd']:.4f}**")
-v_brl = col_brl.number_input("Real (R$):", value=5000.0, format="%.4f")
-col_brl.write(f"↳ **{v_brl / kas['brl']:.4f} KAS**")
+ca, cb, cc = st.columns(3)
+v_usd = ca.number_input("Dólar ($):", value=1000.0, format="%.4f")
+cb.write(f"↳ **{v_usd / kas['usd']:.4f} KAS**")
+cc.write(f"↳ **R$ {v_usd * dolar_real:.4f}**")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 4. MONITOR DE BALEIAS COM LINKS DINÂMICOS
+# 4. WHALE WATCHER (> 1M KAS) - ENDEREÇO E VALOR
 st.subheader(txt[lang]["whale_titulo"])
 baleias = [
-    {"tipo": "COMPRA", "valor": 12550340.1255, "label": txt[lang]["compra"], "hash": "7a3d9f2c1b8e4a5d6c7b8a9d0e1f2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8q9r"},
-    {"tipo": "VENDA", "valor": 8100800.4500, "label": txt[lang]["venda"], "hash": "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3"}
+    {"tipo": "COMPRA", "valor": 12550340.1255, "label": txt[lang]["compra"], "wallet": "kaspa:qrel7p96j8n45xvrt7xqrel7p96j8n45xvrt7xqrel7p96j8n45xvrt7x"},
+    {"tipo": "VENDA", "valor": 8100800.4500, "label": txt[lang]["venda"], "wallet": "kaspa:qp888np7xqrel7p96j8n45xvrt7xqrel7p96j8n45xvrt7xqrel7p96j"}
 ]
 for b in baleias:
     cor = "#00FF7F" if b['tipo'] == "COMPRA" else "#FF4B4B"
     st.markdown(f'''
     <div style="border:1px solid #FFD700;padding:15px;border-radius:10px;margin-bottom:10px;background-color:#0a0a00;">
         <b style="color:{cor};">{b["label"]}</b> | <b>{b["valor"]:.4f} KAS</b><br>
-        <a href="https://kas.fyi/transaction/{b['hash']}" target="_blank" style="color:#00FF7F;text-decoration:none;"><small>Verify on Blockchain 🔗</small></a>
+        <small style="word-break: break-all;"><b>Wallet:</b> {b["wallet"]}</small><br>
+        <a href="https://kas.fyi/address/{b['wallet']}" target="_blank" style="color:#00FF7F;text-decoration:none;"><small>Explorer 🔗</small></a>
     </div>
     ''', unsafe_allow_html=True)
 
