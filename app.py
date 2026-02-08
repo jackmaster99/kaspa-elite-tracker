@@ -75,7 +75,7 @@ if not st.session_state["autenticado"]:
                 st.rerun()
     st.stop()
 
-# --- INTERFACE TÉCNICA RESTAURADA ---
+# --- INTERFACE TÉCNICA ---
 st.markdown("<style>.stApp { background-color: #000; color: #fff; } .card { background-color: #111; padding: 20px; border-radius: 15px; border: 1px solid #00FF7F; margin-bottom: 20px; } [data-testid='stMetricValue'] { color: #00FF7F !important; }</style>", unsafe_allow_html=True)
 
 @st.cache_data(ttl=30)
@@ -93,7 +93,6 @@ kas, dolar_real, top_10_df = buscar_dados()
 
 # HEADER
 st.title(f"🟢 {txt[lang]['titulo']}")
-st.write(f"Connected / Conectado: **{st.session_state['user_email']}**")
 
 # 1. MÉTRICAS (4 DÍGITOS)
 c1, c2, c3, c4 = st.columns(4)
@@ -104,7 +103,7 @@ c4.metric("24h Var.", f"{kas['usd_24h_change']:.2f}%")
 
 st.write("---")
 
-# 2. EXPLORER DE CARTEIRA (FULL)
+# 2. EXPLORER DE CARTEIRA
 st.subheader(txt[lang]["explorer_titulo"])
 wallet_address = st.text_input(txt[lang]["explorer_label"])
 if wallet_address:
@@ -132,7 +131,7 @@ v_brl = col_brl.number_input(txt[lang]["entrada_real"], value=5000.0, format="%.
 col_brl.write(f"↳ **{v_brl / kas['brl']:.4f} KAS**")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 4. MONITOR DE BALEIAS
+# 4. MONITOR DE BALEIAS (LINHA 144 CORRIGIDA AQUI)
 st.subheader(txt[lang]["whale_titulo"])
 baleias = [
     {"tipo": "COMPRA", "valor": 12550340.1255, "label": txt[lang]["compra"]},
@@ -141,11 +140,12 @@ baleias = [
 for b in baleias:
     cor = "#00FF7F" if b['tipo'] == "COMPRA" else "#FF4B4B"
     st.markdown(f'<div style="border:1px solid #FFD700;padding:10px;border-radius:10px;margin-bottom:10px;">'
-                f'<b style="color:{cor};">{b["label"]}</b> | {b["valor']:.4f} KAS</div>', unsafe_allow_html=True)
+                f'<b style="color:{cor};">{b["label"]}</b> | {b["valor"]:.4f} KAS</div>', unsafe_allow_html=True)
 
 # 5. TOP 10
 st.subheader(txt[lang]["top10_titulo"])
-st.dataframe(top_10_df.style.format({'current_price': '{:.4f}'}), use_container_width=True)
+if not top_10_df.empty:
+    st.dataframe(top_10_df.style.format({'current_price': '{:.4f}'}), use_container_width=True)
 
 if st.sidebar.button(txt[lang]["logout"]):
     st.session_state["autenticado"] = False
